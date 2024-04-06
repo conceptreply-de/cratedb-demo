@@ -22,7 +22,6 @@ func PostMeasurements(db *Database) func(c echo.Context) error {
 		if err != nil {
 			return c.String(http.StatusBadRequest, "bad request")
 		}
-		log.Infof("Received new measurement: %s=%f for vehicle %s", measurement.Type, measurement.Value, c.Param("id"))
 		_, err = db.conn.Exec(context.Background(), `
 			INSERT INTO vehicle_measurements 
 			(vehicle_id, measurement_type, measurement_time, measurement_value) 
@@ -31,6 +30,13 @@ func PostMeasurements(db *Database) func(c echo.Context) error {
 		if err != nil {
 			log.Errorf("Failed to insert measurement: %v", err)
 			return c.String(http.StatusInternalServerError, "internal server error")
+		} else {
+			log.Infof(
+				"Inserted new measurement: %s=%f for vehicle %s",
+				measurement.Type,
+				measurement.Value,
+				c.Param("id"),
+			)
 		}
 
 		return c.JSON(http.StatusOK, measurement)

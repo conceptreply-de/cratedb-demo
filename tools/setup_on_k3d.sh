@@ -1,6 +1,6 @@
 #!/bin/bash
 
-
+# create cluster with 4 k8s nodes and CrateDB operator
 k3d cluster create crate-demo -p 5432:31428@server:0 -p 4200:30262@server:0 --servers 4
 helm repo add crate-operator https://crate.github.io/crate-operator
 kubectl create namespace crate-operator
@@ -8,7 +8,7 @@ helm install crate-operator crate-operator/crate-operator \
     --namespace crate-operator \
     --set env.CRATEDB_OPERATOR_DEBUG_VOLUME_STORAGE_CLASS=local-path
 
-
+# create CrateDB cluster with 4 nodes on that cluster
 cat << EOF | kubectl apply -f -
 apiVersion: cloud.crate.io/v1
 kind: CrateDB
@@ -38,12 +38,23 @@ spec:
         heapRatio: 0.25
 EOF
 
-sleep 5 # wait for the operator to create the first pod, so we can wait on condition then
+sleep 5 # wait for the k8s to create operator pod
+operator_pod_name=$(kubectl get pod -l 'app.kubernetes.io/instance=crate-operator' -n crate-operator -o template='{{ (index .items 0).metadata.name }}')
+if [ -z "${operator_pod_name}" ]; then
+  echo "Operator pod not found, try to run the script again later."
+  exit 1
+fi
 
-# downloading crate image would take some time...
-echo "Waiting for CrateDB to be ready... This may take a while for the first time on a fresh cluster."
+kubectl wait --for=condition=Ready --timeout=600s -n crate-operator pod "${operator_pod_name}"
+
+sleep 5 # wait for the operator to create pods, so we can wait on condition then
+echo "Waiting for CrateDB to be ready... This may take a while (>5 minutes) for the first time on a fresh cluster to download the docker image."
 kubectl wait --for=condition=Ready --timeout=600s pod crate-data-my-cluster-my-cluster-0
+kubectl wait --for=condition=Ready --timeout=600s pod crate-data-my-cluster-my-cluster-1
+kubectl wait --for=condition=Ready --timeout=600s pod crate-data-my-cluster-my-cluster-2
+kubectl wait --for=condition=Ready --timeout=600s pod crate-data-my-cluster-my-cluster-3
 
+# patch service to pin specific node ports
 kubectl patch service crate-my-cluster --type=merge \
 -p '
 { "spec": 
@@ -54,12 +65,3 @@ kubectl patch service crate-my-cluster --type=merge \
     ] 
   } 
 }'
-
-# this is a workaround for the case when dev machine has big disk with mostly used space,
-# don't do this for production, this only makes sense for development machines
-psql -h localhost -p 5432 -U system -c "
-  SET GLOBAL PERSISTENT cluster.routing.allocation.disk.watermark.flood_stage = '99%';
-  SET GLOBAL PERSISTENT cluster.routing.allocation.disk.watermark.high = '97%';
-  SET GLOBAL PERSISTENT cluster.routing.allocation.disk.watermark.low = '95%';
-"
-

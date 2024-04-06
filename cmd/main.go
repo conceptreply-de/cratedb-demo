@@ -14,6 +14,7 @@ func main() {
 
 	e.POST("/vehicles/:id/measurements", internal.PostMeasurements(db))
 	e.GET("/vehicles/:id/state_of_charge_chart", internal.GetStateOfChargeChart(db))
+	e.PUT("/vehicles/:id/location", internal.SetVehicleLocation(db))
 
 	e.Logger.Fatal(e.Start(":8080"))
 }

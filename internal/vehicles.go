@@ -16,10 +16,18 @@ type Vehicle struct {
 	Uses        string `json:"use"`
 }
 
+type SearchedVehicle struct {
+	Id          string  `json:"id"`
+	Vin         string  `json:"vin"`
+	Description string  `json:"description"`
+	Uses        string  `json:"use"`
+	SearchScore float64 `json:"score"`
+}
+
 func GetVehicles(db *Database) func(c echo.Context) error {
 	return func(c echo.Context) error {
 
-		rows, err := db.conn.Query(context.Background(), "select * from vehicles;")
+		rows, err := db.conn.Query(context.Background(), "select id, vin, description, use from vehicles;")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "QueryRow failed: %v\n", err)
 			panic(err)
@@ -58,17 +66,17 @@ func GetVehiclesForSearch(db *Database) func(c echo.Context) error {
 			panic(err)
 		}
 		defer rows.Close()
-		var vehicles []Vehicle = []Vehicle{}
+		var vehicles []SearchedVehicle = []SearchedVehicle{}
 		for rows.Next() {
-			var id, vin, description, use, _score string
+			var id, vin, description, use string
+			var _score float64
 			err = rows.Scan(&id, &vin, &description, &use, &_score)
-			vehicles = append(vehicles, Vehicle{Id: id, Vin: vin, Description: description, Uses: use})
+			vehicles = append(vehicles, SearchedVehicle{Id: id, Vin: vin, Description: description, Uses: use, SearchScore: _score})
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Scan failed: %v\n", err)
 				panic(err)
 			}
 		}
-		fmt.Fprintf(os.Stdout, "Vehicles: %s\n", vehicles)
 		return c.JSON(http.StatusOK, vehicles)
 	}
 }
