@@ -83,5 +83,5 @@ func SetVehicleLocation(db *Database) func(c echo.Context) error {
 }
 
 // 16 48 - Vienna
-// 11 47 - Munich
+// 11 48 - Munich
 // 8.5 47 - Zurich (sort of)
