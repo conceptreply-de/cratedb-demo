@@ -17,7 +17,7 @@ You don't need to install all of those tools, f.e k6 only is needed if you use "
 - [psql](https://www.postgresql.org/docs/current/app-psql.html) to run queries and execute scripts
 - [k6](https://grafana.com/docs/k6/latest/) to load our demo application with lots of queries
 - base64 utility - used to decode from base64, look at `tools/get_password.sh`
-- free ports: 8080 (application HTTP), 4200 (CrateDB UI), 5432 (CrateDB "psql.port")
+- free ports: 8080 (application HTTP), 4200 (CrateDB UI), 5432 (CrateDB "psql.port"), 5433 (temporary CrateDB "psql.port" for superuser)
 - less than 95% taken space on your disk (or cluser won't be healthy)
 
 ## Usage
@@ -59,9 +59,18 @@ PGUSER=system psql -h localhost -p 5432 -c "
 
 Initialize some sample data:
 
+Firstly run this in a separate terminal:
+
+```bash
+kubectl port-forward statefulset/crate-data-my-cluster-my-cluster 5433:5432
+```
+
+Then apply sql scripts (first one is using superuser, which needs to do it through port-forward):
+
 ```bash
 # base database schema, indices configs, etc
-PGUSER=system psql -h localhost -f ./schema.sql
+PGUSER=crate psql -h localhost -p 5433 -f ./tools/schema-super.sql
+PGUSER=system psql -h localhost -f ./tools/schema.sql
 
 # sample vehicles and measurements
 PGUSER=system psql -h localhost -f tools/data/vehicles.sql
@@ -71,6 +80,9 @@ PGUSER=system psql -h localhost -f tools/data/austria.sql
 PGUSER=system psql -h localhost -f tools/data/germany.sql
 PGUSER=system psql -h localhost -f tools/data/switzerland.sql
 ```
+
+After this you can stop port-forward running in another terminal.
+
 
 You can execute any query that database supports that same way:
 
@@ -137,6 +149,10 @@ This script would set current vehicle location for vehicle "1", to longitude 8.5
 
 ```bash
 tools/set_current_location.sh 1 8.5 47
+
+tools/set_current_location.sh 1 16 48 # close to Vienna
+tools/set_current_location.sh 1 11 48 # close to Munich
+tools/set_current_location.sh 1 8.5 47 # close to Zurich
 ```
 
 #### Simulating Load
